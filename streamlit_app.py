@@ -4,6 +4,7 @@ import numpy as np
 import os, joblib, json
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     roc_auc_score, roc_curve, auc,
@@ -57,7 +58,7 @@ pipeline, load_msg = load_or_train_pipeline()
 st.sidebar.success(load_msg)
 
 # ============================
-# Helper: Prediction with Risk Labels
+# Prediction with Risk Labels
 # ============================
 def predict_with_risk(model, samples):
     preds = model.predict(samples)
@@ -76,7 +77,7 @@ def predict_with_risk(model, samples):
 # ============================
 # Streamlit Tabs
 # ============================
-st.title("🧠 Parkinson’s Prediction App")
+st.title("🧠 Parkinson’s Prediction App (v19)")
 
 tabs = st.tabs([
     "🔍 EDA", 
@@ -105,17 +106,26 @@ with tabs[0]:
 
 # --- Model Results Tab ---
 with tabs[1]:
-    st.header("Model Leaderboard (from training)")
+    st.header("Model Leaderboard")
     if os.path.exists("parkinsons_final/assets/leaderboard.json"):
         leaderboard = json.load(open("parkinsons_final/assets/leaderboard.json"))
         st.json(leaderboard)
     else:
         st.warning("Leaderboard file not found.")
 
+    # אם קיימות תמונות של ROC/PR curves
+    for curve in ["roc_curve.png", "pr_curve.png", "learning_curve.png"]:
+        path = f"parkinsons_final/assets/{curve}"
+        if os.path.exists(path):
+            st.image(path, caption=curve)
+        else:
+            st.warning(f"{curve} not found.")
+
 # --- Playground Tab ---
 with tabs[2]:
-    st.header("Try Models with Custom Parameters")
-    st.write("⚙️ כאן אפשר להוסיף סליידרים/טקסטבוקס להרצת מודלים שונים (RF, XGB, LGBM וכו’)")
+    st.header("Playground: Compare Models")
+    st.write("כאן אפשר לבחור מודל אחד או כמה מודלים ולהשוות תוצאות")
+    st.info("👉 תוסיף כאן UI לבחירת פרמטרים (sliders / textboxes)")
 
 # --- Prediction Tab ---
 with tabs[3]:
@@ -138,16 +148,18 @@ with tabs[3]:
 # --- Explainability Tab ---
 with tabs[4]:
     st.header("Explainability (SHAP)")
-    if os.path.exists("parkinsons_final/assets/shap_summary.png"):
-        st.image("parkinsons_final/assets/shap_summary.png")
+    shap_path = "parkinsons_final/assets/shap_summary.png"
+    if os.path.exists(shap_path):
+        st.image(shap_path)
     else:
         st.warning("No SHAP summary plot found.")
 
 # --- Training Log Tab ---
 with tabs[5]:
     st.header("Training Log")
-    if os.path.exists("parkinsons_final/assets/training_log.csv"):
-        log_df = pd.read_csv("parkinsons_final/assets/training_log.csv")
+    log_path = "parkinsons_final/assets/training_log.csv"
+    if os.path.exists(log_path):
+        log_df = pd.read_csv(log_path)
         st.dataframe(log_df)
     else:
         st.warning("No training log found.")
