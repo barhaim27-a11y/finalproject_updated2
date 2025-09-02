@@ -1,9 +1,19 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import os, joblib
+import matplotlib.pyplot as plt
+import seaborn as sns
+from io import BytesIO
+
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score,
+    roc_auc_score, roc_curve, auc,
+    precision_recall_curve, confusion_matrix, ConfusionMatrixDisplay
+)
 
 # ============================
-# פונקציה לטעינת מודל עם fallback
+# Load Pipeline with fallback
 # ============================
 def load_or_train_pipeline():
     if os.path.exists("models/pipeline_model.joblib"):
@@ -12,46 +22,33 @@ def load_or_train_pipeline():
         return joblib.load("parkinsons_final/models/pipeline_model.joblib"), "✅ Loaded pipeline_model.joblib from parkinsons_final/models/"
     else:
         st.warning("⚠️ pipeline_model.joblib not found. Training fallback RF model...")
-
-        # אימון מהיר (fallback)
         from sklearn.model_selection import train_test_split
         from sklearn.preprocessing import StandardScaler
         from sklearn.ensemble import RandomForestClassifier
         from sklearn.pipeline import Pipeline
-
         url = "https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/parkinsons.data"
         df = pd.read_csv(url)
         if "name" in df.columns:
             df = df.drop(columns=["name"])
-
         X, y = df.drop("status", axis=1), df["status"]
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42, stratify=y
         )
-
         pipeline = Pipeline([
             ("scaler", StandardScaler()),
             ("classifier", RandomForestClassifier(n_estimators=200, random_state=42))
         ])
         pipeline.fit(X_train, y_train)
-
         os.makedirs("models", exist_ok=True)
         joblib.dump(pipeline, "models/pipeline_model.joblib")
+        return pipeline, "✅ Trained fallback RandomForest pipeline"
 
-        return pipeline, "✅ Trained and saved fallback RandomForest pipeline"
-
-# ============================
-# טעינת המודל
-# ============================
 pipeline, load_msg = load_or_train_pipeline()
 st.sidebar.success(load_msg)
 
 # ============================
-# כאן נשאר כל שאר הקוד של האפליקציה
-# (EDA tab, Model Results tab, Playground tab, Prediction tab, Explainability tab, Training Log tab)
+# Helper: Prediction with Risk Labels
 # ============================
-
-# דוגמה לפונקציית prediction עם Risk Labels (נשארת כמו שהייתה אצלך)
 def predict_with_risk(model, samples):
     preds = model.predict(samples)
     probs = model.predict_proba(samples)[:, 1]
@@ -66,4 +63,69 @@ def predict_with_risk(model, samples):
         "Risk": [risk_label(p) for p in probs]
     }, index=samples.index)
 
-# משם והלאה – ממשיך ה־UI המלא שלך בדיוק כמו בגרסה 16
+# ============================
+# Streamlit Tabs
+# ============================
+st.title("🧠 Parkinson’s Prediction App")
+
+tabs = st.tabs(["🔍 EDA", "🤖 Model Results", "🧪 Playground", "🩺 Prediction", "📊 Explainability", "📜 Training Log"])
+
+# --- EDA Tab ---
+with tabs[0]:
+    st.header("Exploratory Data Analysis")
+    df = pd.read_csv("parkinsons_final/data/parkinsons.csv")
+    st.write("Dataset shape:", df.shape)
+    st.dataframe(df.head())
+    fig, ax = plt.subplots()
+    sns.countplot(x="status", data=df, palette="Set2", ax=ax)
+    st.pyplot(fig)
+
+# --- Model Results Tab ---
+with tabs[1]:
+    st.header("Model Leaderboard (from training)")
+    if os.path.exists("parkinsons_final/assets/leaderboard.json"):
+        leaderboard = json.load(open("parkinsons_final/assets/leaderboard.json"))
+        st.json(leaderboard)
+    else:
+        st.warning("Leaderboard file not found.")
+
+# --- Playground Tab ---
+with tabs[2]:
+    st.header("Try Models with Custom Parameters")
+    st.write("⚙️ (UI controls for trying RandomForest, XGB, LGBM etc...)")
+    # כאן היה הקוד המקורי שלך להרצת מודלים שונים עם פרמטרים
+
+# --- Prediction Tab ---
+with tabs[3]:
+    st.header("Make Predictions")
+    uploaded_file = st.file_uploader("📂 Upload CSV/XLSX", type=["csv", "xlsx"])
+    if uploaded_file:
+        if uploaded_file.name.endswith(".csv"):
+            data = pd.read_csv(uploaded_file)
+        else:
+            data = pd.read_excel(uploaded_file)
+        st.subheader("Uploaded Data")
+        st.dataframe(data.head())
+        if st.button("🔮 Predict"):
+            results = predict_with_risk(pipeline, data)
+            st.subheader("Predictions")
+            st.dataframe(results)
+            csv = results.to_csv(index=False).encode("utf-8-sig")
+            st.download_button("⬇️ Download CSV", data=csv, file_name="predictions.csv", mime="text/csv")
+
+# --- Explainability Tab ---
+with tabs[4]:
+    st.header("Explainability (SHAP)")
+    if os.path.exists("parkinsons_final/assets/shap_summary.png"):
+        st.image("parkinsons_final/assets/shap_summary.png")
+    else:
+        st.warning("No SHAP summary plot found.")
+
+# --- Training Log Tab ---
+with tabs[5]:
+    st.header("Training Log")
+    if os.path.exists("parkinsons_final/assets/training_log.csv"):
+        log_df = pd.read_csv("parkinsons_final/assets/training_log.csv")
+        st.dataframe(log_df)
+    else:
+        st.warning("No training log found.")
