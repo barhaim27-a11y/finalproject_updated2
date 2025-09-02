@@ -1,11 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import os, joblib
+import os, joblib, json
 import matplotlib.pyplot as plt
 import seaborn as sns
-from io import BytesIO
-
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     roc_auc_score, roc_curve, auc,
@@ -13,7 +11,22 @@ from sklearn.metrics import (
 )
 
 # ============================
-# Load Pipeline with fallback
+# Load Dataset (with fallback)
+# ============================
+def load_dataset():
+    if os.path.exists("parkinsons_final/data/parkinsons.csv"):
+        return pd.read_csv("parkinsons_final/data/parkinsons.csv")
+    elif os.path.exists("data/parkinsons.csv"):
+        return pd.read_csv("data/parkinsons.csv")
+    else:
+        url = "https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/parkinsons.data"
+        df = pd.read_csv(url)
+        if "name" in df.columns:
+            df = df.drop(columns=["name"])
+        return df
+
+# ============================
+# Load Pipeline (with fallback)
 # ============================
 def load_or_train_pipeline():
     if os.path.exists("models/pipeline_model.joblib"):
@@ -26,10 +39,7 @@ def load_or_train_pipeline():
         from sklearn.preprocessing import StandardScaler
         from sklearn.ensemble import RandomForestClassifier
         from sklearn.pipeline import Pipeline
-        url = "https://archive.ics.uci.edu/ml/machine-learning-databases/parkinsons/parkinsons.data"
-        df = pd.read_csv(url)
-        if "name" in df.columns:
-            df = df.drop(columns=["name"])
+        df = load_dataset()
         X, y = df.drop("status", axis=1), df["status"]
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42, stratify=y
@@ -68,16 +78,29 @@ def predict_with_risk(model, samples):
 # ============================
 st.title("🧠 Parkinson’s Prediction App")
 
-tabs = st.tabs(["🔍 EDA", "🤖 Model Results", "🧪 Playground", "🩺 Prediction", "📊 Explainability", "📜 Training Log"])
+tabs = st.tabs([
+    "🔍 EDA", 
+    "🤖 Model Results", 
+    "🧪 Playground", 
+    "🩺 Prediction", 
+    "📊 Explainability", 
+    "📜 Training Log"
+])
 
 # --- EDA Tab ---
 with tabs[0]:
     st.header("Exploratory Data Analysis")
-    df = pd.read_csv("parkinsons_final/data/parkinsons.csv")
+    df = load_dataset()
     st.write("Dataset shape:", df.shape)
     st.dataframe(df.head())
+
     fig, ax = plt.subplots()
     sns.countplot(x="status", data=df, palette="Set2", ax=ax)
+    st.pyplot(fig)
+
+    corr = df.corr()
+    fig, ax = plt.subplots(figsize=(10,8))
+    sns.heatmap(corr, cmap="coolwarm", center=0, ax=ax)
     st.pyplot(fig)
 
 # --- Model Results Tab ---
@@ -92,8 +115,7 @@ with tabs[1]:
 # --- Playground Tab ---
 with tabs[2]:
     st.header("Try Models with Custom Parameters")
-    st.write("⚙️ (UI controls for trying RandomForest, XGB, LGBM etc...)")
-    # כאן היה הקוד המקורי שלך להרצת מודלים שונים עם פרמטרים
+    st.write("⚙️ כאן אפשר להוסיף סליידרים/טקסטבוקס להרצת מודלים שונים (RF, XGB, LGBM וכו’)")
 
 # --- Prediction Tab ---
 with tabs[3]:
