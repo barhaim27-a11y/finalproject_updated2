@@ -1,0 +1,6 @@
+﻿Prediction,Probability,Risk
+Healthy,0.406,🟡 Medium
+Parkinson’s,0.877,🔴 High
+Parkinson’s,0.998,🔴 High
+Parkinson’s,0.991,🔴 High
+Healthy,0.071,🟢 Low
